@@ -7,9 +7,9 @@ Assumptions:
 - Command doesn't have spaces
 '''
 
-from argparse import ArgumentParser
 from exceptions import CronParseException
 import re
+import schedule
 
 ONLY_DIGITS_RE = re.compile(r'^\d{1,2}$')
 ASTRICK_INTERVAL_RE = re.compile(r'\*\/\d{1,2}$')
@@ -18,27 +18,26 @@ ONLY_RANGE_RE = re.compile(r'^\d{1,2}\-\d{1,2}$')
 ASTRICK_RE = re.compile(r'^\*$')
 COMMA_SEP_RE = re.compile(r'^(\d{1,2}\,)+\d{1,2}$')
 
+TIME_FIELD_LIMIT = {
+	'minute': [0,59],
+	'hour': [0,23],
+	'day_of_month': [1,30],
+	'month': [1,12],
+	'day_of_week': [0,6]
+}
 
 def get_schedule(cron_type, time_field, cron):
 
-	time_field_limit = {
-		'minute': [0,59],
-		'hour': [0,23],
-		'day_of_month': [1,30],
-		'month': [1,12],
-		'day_of_week': [0,6]
-	}
+	schedule = []
 
-	schedule = ''
-
-	min_range = time_field_limit[time_field][0]
-	max_range = time_field_limit[time_field][1]
+	min_range = TIME_FIELD_LIMIT[time_field][0]
+	max_range = TIME_FIELD_LIMIT[time_field][1]
 
 	if cron_type == 'ONLY_DIGITS':
 		num = int(cron)
 		if num < min_range or num > max_range:
 			raise ValueError(f'Invalid cron for {time_field}: {cron}')
-		schedule = cron
+		schedule = [num]
 
 	elif cron_type == 'ASTRICK_INTERVAL':
 		interval = int(cron.split('/')[1])
@@ -46,7 +45,7 @@ def get_schedule(cron_type, time_field, cron):
 			raise ValueError(f'Invalid cron for {time_field}: {cron}')
 		num = min_range
 		while num <= max_range:
-			schedule += str(num) + ' '
+			schedule.append(num)
 			num += interval
 
 	elif cron_type == 'RANGE_INTERVAL':
@@ -57,7 +56,7 @@ def get_schedule(cron_type, time_field, cron):
 			raise ValueError(f'Invalid cron for {time_field}: {cron}')
 		num = min_num
 		while num <= max_num:
-			schedule += str(num) + ' '
+			schedule.append(num)
 			num += interval
 
 	elif cron_type == 'ONLY_RANGE':
@@ -67,13 +66,13 @@ def get_schedule(cron_type, time_field, cron):
 			raise ValueError(f'Invalid cron for {time_field}: {cron}')
 		num = min_num
 		while num <= max_num:
-			schedule += str(num) + ' '
+			schedule.append(num)
 			num += 1
 
 	elif cron_type == 'ASTRICK':
 		num = min_range
 		while num <= max_range:
-			schedule += str(num) + ' '
+			schedule.append(num)
 			num += 1
 
 	elif cron_type == 'COMMA_SEP':
@@ -86,9 +85,9 @@ def get_schedule(cron_type, time_field, cron):
 		if min_num < min_range or max_num > max_range:
 			raise ValueError(f'Invalid cron for {time_field}: {cron}')
 
-		schedule += ' '.join(cron.split(','))
+		schedule += list(map(int, cron.split(',')))
 
-	return schedule.strip()
+	return schedule
 
 def parse_cronstring(cronstring):
 	cron_parts = list(map(lambda s: s.strip(), cronstring.split(' ')))
@@ -110,12 +109,11 @@ def parse_cronstring(cronstring):
 			if match:
 				# print({'pattern': pattern, 'cron_type': pattern_name, 'cron': cron, 'time_field': time_field, 'match': match.group(), 'pattern_name': pattern_name})
 				schedule = get_schedule(pattern_name, time_field, cron)
-				# print(f'{time_field.upper()}\t{schedule}')
-				all_schedule[time_field.upper()] = schedule
+				all_schedule[time_field] = schedule
 				break
 		else:
 			raise CronParseException(f'No match for time_field {time_field}, cron: {cron}')
-		
+
 		all_schedule['COMMAND'] = ' '.join(cron_parts[5:])
 
 	return all_schedule
@@ -123,20 +121,6 @@ def parse_cronstring(cronstring):
 def print_schedule(schedule):
 	for key, value in schedule.items():
 		print(f'{key}\t{value}')
+	
 
 
-def main():
-	parser = ArgumentParser()
-	parser.add_argument('cronstring', type=str)
-	cronstring = parser.parse_args().cronstring
-	try:
-		schedule = parse_cronstring(cronstring)
-		print_schedule(schedule)
-		# for key, value in schedule.items():
-		# 	print(f'{key}\t{value}')
-	except ValueError as v:
-		print(v)
-
-
-if __name__ == '__main__':
-	main()

@@ -18,3 +18,5 @@ You'll see relevant errors when the cron string is invalid, such as when numbers
 
 # Changes to make
 - implement cyclic order for ranges. Suppose if the days are supported as 2-5 and return 2,3,4,5 then if I give 5-2 that should yield me 5,6,7,1,2. 
+- use timezones
+- make a full fleged cron job scheduler
